@@ -76,6 +76,11 @@ var safety_enabled := true
 var decision_every := 1
 var decisions_made := 0
 var decisions_last_tick := 0
+## Phase 3 tier promotion: decisions a promoted creature made outside its
+## bucket. A promoted creature decides every tick, so this counts only the
+## extra decisions promotion caused, not the ones its bucket would have made.
+var promotions_made := 0
+var promotions_last_tick := 0
 ## Fifth ablation switch, for the Phase 1 exit criteria: off stops new material
 ## hardening and softening. Compaction, wetness and drying keep running.
 var hardening_enabled := true
@@ -362,6 +367,7 @@ func _decay_needs(step_dt: float) -> void:
 
 func _decide_all() -> void:
 	decisions_last_tick = 0
+	promotions_last_tick = 0
 	var bucket: int = int(tick.steps_taken) % maxi(decision_every, 1)
 	var radius := params.f("perception", "sensory_radius_cells", 18.0)
 	# Read once per tick, not once per creature per candidate.
@@ -380,8 +386,19 @@ func _decide_all() -> void:
 		# moves and acts in _execute_all below. Bucket is the slot id,
 		# which is stable across a creature's life, so its cadence never
 		# jitters; a slot reused by a newborn keeps that slot's bucket.
-		if decision_every > 1 and (i % decision_every) != bucket:
+		# Tier promotion, Phase 3 second slice: a creature that is
+		# fleeing, or the one the player is inspecting, decides every
+		# tick instead. Both are significance, not a new behaviour: a
+		# fleeing creature's threat can move in a tick, and the inspected
+		# creature is the one whose scores the panel shows. Promotion is
+		# narrow on purpose — a starving population would promote almost
+		# everyone, which would just be unstaggering with extra steps.
+		var promoted := i == inspect_id or int(store.verb[i]) == StoreRef.Verb.FLEE
+		if decision_every > 1 and not promoted and (i % decision_every) != bucket:
 			continue
+		if decision_every > 1 and promoted and (i % decision_every) != bucket:
+			promotions_last_tick += 1
+			promotions_made += 1
 		decisions_last_tick += 1
 		decisions_made += 1
 		var prev_verb := int(store.verb[i])
@@ -1792,6 +1809,8 @@ func metrics() -> Dictionary:
 		"decisions_made": decisions_made,
 		"decisions_last_tick": decisions_last_tick,
 		"decision_every_ticks": decision_every,
+		"promotions_made": promotions_made,
+		"promotions_last_tick": promotions_last_tick,
 		"execute_ms": tick.last_execute_ms,
 		"material_processed": int(tick.last_material_stats.get("processed", 0)),
 		"material_pending": int(tick.last_material_stats.get("active_cells", grid.active_cell_count())),

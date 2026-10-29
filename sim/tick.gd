@@ -12,7 +12,8 @@ extends RefCounted
 ##      threats and exposure), apply starvation/dehydration damage, rebuild the
 ##      neighbour index
 ##   5. decide: score every generic verb for this tick's decision bucket
-##      (every creature when decision_every_ticks = 1, otherwise 1/N of them)
+##      (every creature when decision_every_ticks = 1, otherwise 1/N of them,
+##      plus promoted tiers: fleeing and inspected creatures every tick)
 ##   6. execute movement and actions, queue events
 ##   7. apply queued events (deaths)
 ##   8-9. learning and first-time detectors

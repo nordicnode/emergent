@@ -446,10 +446,28 @@ than replaying an episode. Pattern genes are not implemented, only hue.
   step's bucket holds exactly 7 of 20 founders, and thirty same-seed steps
   make well under twice a third of the unstaggered decisions without the
   population collapsing.
-- **Not yet Phase 3.** Tier promotion by significance, the throttling
-  governor, chunked/zoom-tier rendering, shared gradient fields, and the
-  500–1,000-creature exit criterion are all still to come. Staggering alone
-  does not claim them.
+### Tier promotion (Phase 3, second slice)
+
+- **Mechanism.** On top of staggering, a creature that is fleeing or the
+  one the player is inspecting decides every tick, whatever its bucket.
+  Both are significance, not a new behaviour: a fleeing creature's threat
+  can move in a tick, and the inspected creature is the one whose scores
+  the panel shows. Promotion is deliberately narrow — promoting on low
+  food or water would promote almost everyone in a hungry population,
+  which would just be unstaggering with extra steps.
+- **Counters.** `Sim.promotions_made` and `Sim.promotions_last_tick` are
+  in `metrics()`, counting only out-of-bucket decisions, so a run can
+  prove promotion caused extra decisions instead of assuming it. At the
+  shipped cadence (every = 1) there is no bucket to be outside, so
+  promotion is a no-op and the counters stay at 0.
+- **Tests.** The suite adds a tier promotion section: with every = 3 the
+  first step decides 9, not 7, when slots 0 (inspected) and 2 (fleeing)
+  sit outside bucket 1; a promoted creature inside its bucket adds no
+  decision and no promotion.
+- **Not yet Phase 3.** The throttling governor, chunked/zoom-tier
+  rendering, shared gradient fields, and the 500–1,000-creature exit
+  criterion are all still to come. Staggering plus promotion alone do
+  not claim them.
 - **Running headless from a fresh clone.** Run
   `godot --headless --editor --import` once first: without the generated
   class cache, a headless script run idles instead of executing.

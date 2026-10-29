@@ -92,6 +92,8 @@ func run_all() -> Array:
 	_test_search_candidate()
 	_section("decision staggering")
 	_test_staggering()
+	_section("tier promotion")
+	_test_tier_promotion()
 	_section("memory is lived, not inherited")
 	_test_memory_not_inherited()
 	_section("phase 2 detectors and history")
@@ -613,6 +615,40 @@ func _test_staggering() -> void:
 	# the decisions, and the population does not collapse in the process.
 	_check(sim.decisions_made * 3 < unstaggered.decisions_made * 2, "staggered decisions are well under unstaggered (%d vs %d)" % [sim.decisions_made, unstaggered.decisions_made])
 	_check(sim.alive_count() >= 20, "the staggered population does not collapse in thirty steps (%d alive)" % sim.alive_count())
+
+
+func _test_tier_promotion() -> void:
+	# Same setup as the staggering test: every = 3, first step bucket = 1,
+	# so slots 1, 4, ..., 19 decide: 7. Slots 0 and 2 are outside it.
+	var p = ParamsRef.load_default()
+	var brain: Dictionary = p.data.get("brain", {})
+	brain["decision_every_ticks"] = 3
+	p.data["brain"] = brain
+	var sim = SimRef.new(p, 101)
+	sim.generate_world()
+	sim.spawn_founders()
+	sim.inspect_id = 0
+	sim.store.verb[2] = StoreRef.Verb.FLEE
+	sim.step(sim.dt)
+	_check(sim.decisions_last_tick == 9, "fleeing and inspected creatures decide outside their bucket (9 decisions, got %d)" % sim.decisions_last_tick)
+	_check(sim.promotions_last_tick == 2, "promotion counts only the out-of-bucket decisions (2, got %d)" % sim.promotions_last_tick)
+	# A promoted creature inside the bucket is not an extra decision.
+	var sim2 = SimRef.new(p, 101)
+	sim2.generate_world()
+	sim2.spawn_founders()
+	sim2.inspect_id = 1
+	sim2.step(sim2.dt)
+	_check(sim2.decisions_last_tick == 7, "a promoted creature inside its bucket adds no decision (7, got %d)" % sim2.decisions_last_tick)
+	_check(sim2.promotions_last_tick == 0, "a promoted creature inside its bucket adds no promotion (0, got %d)" % sim2.promotions_last_tick)
+	# At the shipped cadence there is no bucket to be outside, so promotion
+	# is a no-op rather than a second decision path.
+	var sim3 = SimRef.new(ParamsRef.load_default(), 101)
+	sim3.generate_world()
+	sim3.spawn_founders()
+	sim3.inspect_id = 0
+	sim3.store.verb[2] = StoreRef.Verb.FLEE
+	sim3.step(sim3.dt)
+	_check(sim3.promotions_last_tick == 0, "promotion is a no-op at decision_every_ticks = 1 (0, got %d)" % sim3.promotions_last_tick)
 
 
 func _test_memory_not_inherited() -> void:
