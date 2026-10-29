@@ -425,6 +425,35 @@ powers beyond the three brushes remain absent. Imitation copies places, not
 action sequences; memory retrieval still biases current action weights rather
 than replaying an episode. Pattern genes are not implemented, only hue.
 
+### Decision staggering (Phase 3, first slice)
+
+- **Mechanism.** `brain.decision_every_ticks` in `data/parameters.json`
+  (shipped value 1, i.e. the Phase 1/2 behaviour). Above 1, creatures are
+  split into stable buckets by slot id and one bucket decides per tick;
+  movement and action execution still run every tick for every creature.
+  A creature re-decides at most (every − 1) ticks late, including the flee
+  interrupt — 0.13 simulated seconds at every = 3 and 15 Hz.
+- **Counters.** `Sim.decisions_made` and `Sim.decisions_last_tick` are in
+  `metrics()`, so a run can prove the bucket size instead of assuming it.
+- **Probe.** `tools/stagger_probe.gd` overrides the cadence in memory only
+  (`--days= --seed= --every=`), so a staggered run never changes the shipped
+  register. Seed 101, 0.25 days, on this VM: unstaggered 14.10 ms/step
+  (decide 9.11 ms) vs staggered every = 3 at 7.99 ms/step (decide 3.07 ms),
+  with an identical outcome (29 alive, 9 births, 0 deaths). Three days
+  staggered on the same seed: 39 alive, 20 births, 1 death, diversity 0.397.
+- **Tests.** The suite adds a staggering section: the shipped register
+  decides every tick, a register value of 3 is read at startup, the first
+  step's bucket holds exactly 7 of 20 founders, and thirty same-seed steps
+  make well under twice a third of the unstaggered decisions without the
+  population collapsing.
+- **Not yet Phase 3.** Tier promotion by significance, the throttling
+  governor, chunked/zoom-tier rendering, shared gradient fields, and the
+  500–1,000-creature exit criterion are all still to come. Staggering alone
+  does not claim them.
+- **Running headless from a fresh clone.** Run
+  `godot --headless --editor --import` once first: without the generated
+  class cache, a headless script run idles instead of executing.
+
 ## Running
 
 ```bash

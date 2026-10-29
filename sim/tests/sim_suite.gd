@@ -90,6 +90,8 @@ func run_all() -> Array:
 	_test_carrying()
 	_section("search when nothing is in sight")
 	_test_search_candidate()
+	_section("decision staggering")
+	_test_staggering()
 	_section("memory is lived, not inherited")
 	_test_memory_not_inherited()
 	_section("phase 2 detectors and history")
@@ -577,6 +579,40 @@ func _test_search_candidate() -> void:
 	var short_leg: float = sim._commitment_for_aim(id, StoreRef.Verb.WANDER, sim.store.px[id] + 1.0, sim.store.py[id])
 	_check(long_leg >= 6.0, "a 20-cell wander leg is committed long enough to reach it (%.1f s)" % long_leg)
 	_check(short_leg <= 1.3, "a short leg still uses the minimum commitment (%.1f s)" % short_leg)
+
+
+func _test_staggering() -> void:
+	# The shipped register stays unstaggered, so the default is every tick.
+	var defaults = ParamsRef.load_default()
+	var default_sim = SimRef.new(defaults, 101)
+	_check(default_sim.decision_every == 1, "the shipped register decides every tick (decision_every_ticks = 1)")
+	# A fresh parameter set, mutated in memory only, so this test cannot
+	# leak a cadence change into the tests that follow it.
+	var p = ParamsRef.load_default()
+	var brain: Dictionary = p.data.get("brain", {})
+	brain["decision_every_ticks"] = 3
+	p.data["brain"] = brain
+	var sim = SimRef.new(p, 101)
+	_check(sim.decision_every == 3, "a register value of 3 is read at startup")
+	sim.generate_world()
+	sim.spawn_founders()
+	_check(sim.alive_count() == 20, "twenty founders for the bucket count")
+	sim.step(sim.dt)
+	# First step: steps_taken = 1, bucket = 1, so slots 1, 4, ..., 19 decide: 7.
+	# Founders start adult, so later steps gain births and exact totals
+	# move; the first step, before any birth, pins the bucket size exactly.
+	_check(sim.decisions_last_tick == 7, "only the first step's bucket decides (7 of 20, got %d)" % sim.decisions_last_tick)
+	for _k in range(29):
+		sim.step(sim.dt)
+	var unstaggered = SimRef.new(ParamsRef.load_default(), 101)
+	unstaggered.generate_world()
+	unstaggered.spawn_founders()
+	for _k in range(30):
+		unstaggered.step(unstaggered.dt)
+	# Same seed, same thirty steps: staggering makes roughly a third of
+	# the decisions, and the population does not collapse in the process.
+	_check(sim.decisions_made * 3 < unstaggered.decisions_made * 2, "staggered decisions are well under unstaggered (%d vs %d)" % [sim.decisions_made, unstaggered.decisions_made])
+	_check(sim.alive_count() >= 20, "the staggered population does not collapse in thirty steps (%d alive)" % sim.alive_count())
 
 
 func _test_memory_not_inherited() -> void:

@@ -95,6 +95,7 @@
   "sensory_radius_cells": 18.0
  },
  "brain": {
+  "decision_every_ticks": 1,
   "softmax_top_k": 4,
   "temperature_base": 0.1,
   "temperature_distress": 0.35,

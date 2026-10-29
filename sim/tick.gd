@@ -11,7 +11,8 @@ extends RefCounted
 ##   4. ensure learned stores, decay needs (including safety from remembered
 ##      threats and exposure), apply starvation/dehydration damage, rebuild the
 ##      neighbour index
-##   5. decide: score every generic verb for every creature
+##   5. decide: score every generic verb for this tick's decision bucket
+##      (every creature when decision_every_ticks = 1, otherwise 1/N of them)
 ##   6. execute movement and actions, queue events
 ##   7. apply queued events (deaths)
 ##   8-9. learning and first-time detectors

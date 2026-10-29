@@ -67,6 +67,15 @@ var carry_enabled := true
 ## removes flee. The disable-one-system test for the fear story, not a player
 ## setting.
 var safety_enabled := true
+## Phase 3 decision staggering: how many sim ticks pass between a creature's
+## decisions. 1 is the Phase 1/2 behaviour (decide every tick). Above 1,
+## creatures are split into stable buckets by slot id, one bucket deciding
+## per tick, while movement and action execution still run every tick.
+## A creature therefore re-decides at most (every - 1) ticks late, including
+## the flee interrupt; at every = 3 and 15 Hz that is 0.13 simulated seconds.
+var decision_every := 1
+var decisions_made := 0
+var decisions_last_tick := 0
 ## Fifth ablation switch, for the Phase 1 exit criteria: off stops new material
 ## hardening and softening. Compaction, wetness and drying keep running.
 var hardening_enabled := true
@@ -162,6 +171,7 @@ func _init(p: SimParams, seed_value: int = 12345) -> void:
 	grid.food_rot_threshold = params.f("materials", "rot_toxicity_threshold", 0.40)
 	grid.convert_max_hardness = params.f("materials", "convert_max_hardness", 0.35)
 	grid.food_min_amount = params.f("materials", "food_min_amount", 0.02)
+	decision_every = clampi(params.i("brain", "decision_every_ticks", 1), 1, 15)
 	store = StoreRef.new()
 	memory = MemoryRef.new()
 	opinion = OpinionRef.new(
@@ -351,6 +361,8 @@ func _decay_needs(step_dt: float) -> void:
 
 
 func _decide_all() -> void:
+	decisions_last_tick = 0
+	var bucket: int = int(tick.steps_taken) % maxi(decision_every, 1)
 	var radius := params.f("perception", "sensory_radius_cells", 18.0)
 	# Read once per tick, not once per creature per candidate.
 	var gate_food := params.f("repro", "gate_food", 0.55)
@@ -363,6 +375,15 @@ func _decide_all() -> void:
 	for i in store.count:
 		if store.alive[i] == 0:
 			continue
+		# Staggering: only this tick's bucket re-decides. Every other
+		# creature keeps its current verb, aim and commitment, and still
+		# moves and acts in _execute_all below. Bucket is the slot id,
+		# which is stable across a creature's life, so its cadence never
+		# jitters; a slot reused by a newborn keeps that slot's bucket.
+		if decision_every > 1 and (i % decision_every) != bucket:
+			continue
+		decisions_last_tick += 1
+		decisions_made += 1
 		var prev_verb := int(store.verb[i])
 		var ready := _repro_ready_with(i, gate_food, gate_water, gate_energy, gate_health)
 		var partner := -1
@@ -1768,6 +1789,9 @@ func metrics() -> Dictionary:
 		"material_ms": tick.last_material_ms,
 		"needs_ms": tick.last_needs_ms,
 		"decide_ms": tick.last_decide_ms,
+		"decisions_made": decisions_made,
+		"decisions_last_tick": decisions_last_tick,
+		"decision_every_ticks": decision_every,
 		"execute_ms": tick.last_execute_ms,
 		"material_processed": int(tick.last_material_stats.get("processed", 0)),
 		"material_pending": int(tick.last_material_stats.get("active_cells", grid.active_cell_count())),
